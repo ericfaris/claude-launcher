@@ -86,13 +86,13 @@ _lc_display() {
     echo ""
 
     printf "  %s%2d%s  %s%s%s  %s\n" \
-        "$c_num" 0 "$c_reset" "$c_icon" "$icon_terminal" "$c_reset" "terminal"
+        "$c_num" 1 "$c_reset" "$c_icon" "$icon_terminal" "$c_reset" "terminal"
     printf "  %s%2d%s  %s%s%s  %s\n" \
-        "$c_num" 1 "$c_reset" "$c_icon" "$icon_root" "$c_reset" "projects (root)"
+        "$c_num" 2 "$c_reset" "$c_icon" "$icon_root" "$c_reset" "projects (root)"
 
     if [[ ${#dirs[@]} -gt 0 ]]; then
         echo ""
-        local i=2
+        local i=3
         local dir name icon
         for dir in "${dirs[@]}"; do
             name="$(basename "$dir")"
@@ -122,17 +122,17 @@ lc() {
     local c_confirm=$'\e[38;5;242m'
     local c_reset=$'\e[0m'
 
-    if [[ "$choice" == "0" ]]; then
+    if [[ "$choice" == "1" ]]; then
         builtin cd "$projects_dir" || return 1
         printf "  %s→ %s%s\n" "$c_confirm" "$(pwd)" "$c_reset"
         echo ""
-    elif [[ "$choice" == "1" ]]; then
+    elif [[ "$choice" == "2" ]]; then
         builtin cd "$projects_dir" || return 1
         printf "  %s→ %s%s\n" "$c_confirm" "$(pwd)" "$c_reset"
         echo ""
         claude
-    elif [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 2 && choice <= ${#dirs[@]} + 1 )); then
-        local selected="${dirs[$((choice - 1))]}"
+    elif [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 3 && choice <= ${#dirs[@]} + 2 )); then
+        local selected="${dirs[$((choice - 2))]}"
         builtin cd "$selected" || return 1
         printf "  %s→ %s%s\n" "$c_confirm" "$(pwd)" "$c_reset"
         echo ""
