@@ -4,6 +4,8 @@ If you keep all your coding projects in one folder and use Claude Code as your A
 
 Technically: a zsh function that presents a styled, numbered menu of your projects directory and launches [Claude Code](https://claude.ai/code) in the selected one. Each project is automatically assigned a [Nerd Font](https://www.nerdfonts.com/) icon by Claude AI on first use, then cached locally. The root folder defaults to `~/projects` and is configurable via `LC_PROJECTS_DIR`.
 
+**Supported platforms:** Linux, macOS, and Windows via WSL2. Native Windows (PowerShell/CMD) is not supported.
+
 ## Screenshot
 
 ```
@@ -23,9 +25,9 @@ Technically: a zsh function that presents a styled, numbered menu of your projec
 
 ## Requirements
 
-### 1. zsh
+### 1. zsh (Linux, macOS, or WSL2)
 
-The script uses zsh-specific features (`read -rk 1`, `local -a`, zsh arrays). It must be sourced from `~/.zshrc` and run in a zsh session.
+The script uses zsh-specific features (`read -rk 1`, `local -a`, zsh arrays). It must be sourced from `~/.zshrc` and run in a zsh session. Native Windows (PowerShell, CMD, Git Bash) is not supported — use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/install) instead.
 
 ### 2. Claude Code CLI
 
