@@ -1,21 +1,25 @@
 # claude-launcher
 
-A zsh function that presents a styled menu of your `~/projects` subdirectories and launches [Claude Code](https://claude.ai/code) in the selected one. Each project is automatically assigned a [Nerd Font](https://www.nerdfonts.com/) icon by Claude AI on first use, then cached locally.
+If you keep all your coding projects in one folder and use Claude Code as your AI pair programmer, this tool saves you a few steps every time you sit down to work. Instead of manually `cd`-ing into a project and typing `claude`, you just run `lc` and press a single key — the launcher drops you into the right directory and opens Claude automatically.
+
+Technically: a zsh function that presents a styled, numbered menu of your projects directory and launches [Claude Code](https://claude.ai/code) in the selected one. Each project is automatically assigned a [Nerd Font](https://www.nerdfonts.com/) icon by Claude AI on first use, then cached locally. The root folder defaults to `~/projects` and is configurable via `LC_PROJECTS_DIR`.
 
 ## Screenshot
 
 ```
   ──  Claude Launcher  ──────────────
 
-   1    terminal
-   2    projects (root)
+    1      terminal
+    2      projects (root)
 
-   3    my-app
-   4    dotfiles
-   5    scripts
+    3      my-app
+    4      dotfiles
+    5      scripts
 
   ›
 ```
+
+> Icons are [Nerd Font](https://www.nerdfonts.com/) glyphs chosen by Claude AI per project and rendered in color. They appear as boxes above if your font doesn't support Nerd Fonts.
 
 ## Requirements
 
@@ -53,12 +57,12 @@ Run this in your terminal. If you see a folder icon (), your font is working:
 echo $'\uf07b'
 ```
 
-### 4. `~/projects` directory
+### 4. A projects root directory
 
-The launcher expects a `~/projects` directory containing your project subdirectories. It lists all immediate subdirectories (`-maxdepth 1`) as menu options.
+The launcher scans one level deep inside a root folder and lists each subdirectory as a menu option. It defaults to `~/projects` and can be changed with the `LC_PROJECTS_DIR` environment variable.
 
 ```
-~/projects/
+~/projects/          ← LC_PROJECTS_DIR (default)
 ├── my-app/
 ├── dotfiles/
 └── scripts/
