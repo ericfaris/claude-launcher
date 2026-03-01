@@ -3,9 +3,12 @@
 # Source this file from ~/.zshrc:
 #   source ~/projects/claude-launcher/claude-launcher.sh
 #
+# Optionally set LC_PROJECTS_DIR to override the default root folder:
+#   export LC_PROJECTS_DIR="$HOME/dev"   # defaults to ~/projects
+#
 # Then run with:  lc
 # Or auto-launch by adding to ~/.zshrc:
-#   [[ "$(pwd)" == "$HOME/projects" ]] && lc
+#   [[ "$(pwd)" == "$LC_PROJECTS_DIR" ]] && lc
 
 _lc_icon_read() {
     local name="$1" cache="$HOME/.claude-launcher-icons"
@@ -68,6 +71,8 @@ Reply with ONLY a single Nerd Font icon character. No explanation, no punctuatio
 }
 
 _lc_display() {
+    local root_dir="$1"
+    shift
     local -a dirs=("$@")
 
     local c_line=$'\e[38;5;240m'
@@ -88,7 +93,7 @@ _lc_display() {
     printf "  %s%2d%s  %s%s%s  %s\n" \
         "$c_num" 1 "$c_reset" "$c_icon" "$icon_terminal" "$c_reset" "terminal"
     printf "  %s%2d%s  %s%s%s  %s\n" \
-        "$c_num" 2 "$c_reset" "$c_icon" "$icon_root" "$c_reset" "projects (root)"
+        "$c_num" 2 "$c_reset" "$c_icon" "$icon_root" "$c_reset" "$(basename "$root_dir") (root)"
 
     if [[ ${#dirs[@]} -gt 0 ]]; then
         echo ""
@@ -108,14 +113,14 @@ _lc_display() {
 }
 
 lc() {
-    local projects_dir="$HOME/projects"
+    local projects_dir="${LC_PROJECTS_DIR:-$HOME/projects}"
     local -a dirs
 
     while IFS= read -r dir; do
         dirs+=("$dir")
     done < <(find "$projects_dir" -maxdepth 1 -mindepth 1 -type d | sort)
 
-    _lc_display "${dirs[@]}"
+    _lc_display "$projects_dir" "${dirs[@]}"
     read -rk 1 choice
     echo ""
 

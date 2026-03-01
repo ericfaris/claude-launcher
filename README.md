@@ -81,10 +81,16 @@ The launcher expects a `~/projects` directory containing your project subdirecto
    source ~/.zshrc
    ```
 
-4. Optionally, auto-launch the menu when you open a shell in `~/projects`:
+4. Optionally, set a custom root folder (defaults to `~/projects`):
    ```sh
    # Add to ~/.zshrc
-   [[ "$(pwd)" == "$HOME/projects" ]] && lc
+   export LC_PROJECTS_DIR="$HOME/dev"
+   ```
+
+5. Optionally, auto-launch the menu when you open a shell in the root folder:
+   ```sh
+   # Add to ~/.zshrc
+   [[ "$(pwd)" == "${LC_PROJECTS_DIR:-$HOME/projects}" ]] && lc
    ```
 
 ## Usage
@@ -93,8 +99,8 @@ Run `lc` to open the menu. Press a single key to select:
 
 | Key | Action |
 |-----|--------|
-| `1` | `cd` to `~/projects` (no Claude) |
-| `2` | `cd` to `~/projects` and launch Claude |
+| `1` | `cd` to the root folder (no Claude) |
+| `2` | `cd` to the root folder and launch Claude |
 | `3`+ | `cd` to that project directory and launch Claude |
 
 ## Icon caching
