@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Pre-Claude project launcher
-# Source this file from ~/.bashrc:
-#   source ~/.claude-launcher.sh
+# Source this file from ~/.zshrc:
+#   source ~/projects/claude-launcher/claude-launcher.sh
 #
 # Then run with:  lc
-# Or auto-launch by adding to ~/.bashrc:
+# Or auto-launch by adding to ~/.zshrc:
 #   [[ "$(pwd)" == "$HOME/projects" ]] && lc
 
 lc() {
