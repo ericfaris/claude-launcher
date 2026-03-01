@@ -121,7 +121,7 @@ lc() {
     done < <(find "$projects_dir" -maxdepth 1 -mindepth 1 -type d | sort)
 
     _lc_display "$projects_dir" "${dirs[@]}"
-    read -rk 1 choice
+    read -r choice
     echo ""
 
     local c_confirm=$'\e[38;5;242m'
