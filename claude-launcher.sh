@@ -58,7 +58,8 @@ Reply with ONLY a single Nerd Font icon character. No explanation, no punctuatio
 
     icon="$(claude -p "$prompt" 2>/dev/null | tr -d '[:space:]')"
 
-    if [[ -z "$icon" ]]; then
+    # Nerd Font icons are 1-3 chars; longer results are error messages
+    if [[ -z "$icon" ]] || (( ${#icon} > 4 )); then
         icon="$fallback"
     fi
 
