@@ -10,6 +10,25 @@
 # Or auto-launch by adding to ~/.zshrc:
 #   [[ "$(pwd)" == "$LC_PROJECTS_DIR" ]] && lc
 
+_LC_TAB_TITLE=""
+
+_lc_set_title() {
+    local title="$1"
+    _LC_TAB_TITLE="$title"
+    # OSC 0 sets tab/window title; use ST terminator for Windows Terminal compatibility
+    printf '\033]0;%s\033\\' "$title"
+}
+
+_lc_precmd() {
+    [[ -n "$_LC_TAB_TITLE" ]] && printf '\033]0;%s\033\\' "$_LC_TAB_TITLE"
+}
+
+# Register precmd hook so the title persists across prompt redraws
+# (needed when a zsh framework like oh-my-zsh resets the title on each prompt)
+if [[ -n "$ZSH_VERSION" ]] && (( ${precmd_functions[(I)_lc_precmd]} == 0 )); then
+    precmd_functions+=(_lc_precmd)
+fi
+
 _lc_icon_read() {
     local name="$1" cache="$HOME/.claude-launcher-icons"
     [[ -f "$cache" ]] || return 1
@@ -129,16 +148,19 @@ lc() {
 
     if [[ "$choice" == "1" ]]; then
         builtin cd "$projects_dir" || return 1
+        _lc_set_title "$(basename "$projects_dir")"
         printf "  %s→ %s%s\n" "$c_confirm" "$(pwd)" "$c_reset"
         echo ""
     elif [[ "$choice" == "2" ]]; then
         builtin cd "$projects_dir" || return 1
+        _lc_set_title "$(basename "$projects_dir")"
         printf "  %s→ %s%s\n" "$c_confirm" "$(pwd)" "$c_reset"
         echo ""
         claude
     elif [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 3 && choice <= ${#dirs[@]} + 2 )); then
         local selected="${dirs[$((choice - 2))]}"
         builtin cd "$selected" || return 1
+        _lc_set_title "$(basename "$selected")"
         printf "  %s→ %s%s\n" "$c_confirm" "$(pwd)" "$c_reset"
         echo ""
         claude
