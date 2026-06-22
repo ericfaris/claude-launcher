@@ -18,6 +18,8 @@ Technically: a zsh function that presents a styled, numbered menu of your projec
     4      dotfiles
     5      scripts
 
+    c      configure
+
   ›
 ```
 
@@ -108,6 +110,48 @@ Run `lc` to open the menu. Press a single key to select:
 | `1` | `cd` to the root folder (no Claude) |
 | `2` | `cd` to the root folder and launch Claude |
 | `3`+ | `cd` to that project directory and launch Claude |
+| `c` | Open the interactive configuration walkthrough (see below) |
+
+## Per-project Claude flags
+
+You can control which flags `claude` is launched with on a per-project basis. The easiest way is the built-in **configuration walkthrough**: run `lc` and press `c`. It lets you:
+
+- Toggle **YOLO mode** (`--dangerously-skip-permissions`) as the default for all projects
+- Set arbitrary default flags applied to every project
+- Configure a specific project (YOLO, plain `claude`, custom flags, or inherit the default)
+- View the raw config file
+
+The walkthrough simply reads and writes the config file described below — you can also edit it by hand.
+
+### Config file
+
+The launcher reads an optional config file at `~/.claude-launcher-config` (override the path with the `LC_CONFIG_FILE` environment variable). It's a plain `key=value` text file:
+
+```sh
+# ~/.claude-launcher-config
+
+# Applied to every project unless overridden below
+default_flags=--dangerously-skip-permissions
+
+# Per-project overrides, keyed by directory name.
+# An empty value disables the inherited default (plain `claude`).
+goose-cli=
+dev-dashboard=--dangerously-skip-permissions --model opus
+```
+
+Resolution order for a given project:
+
+1. A per-project line matching the directory name wins — **even if its value is empty** (use this to turn off an inherited default for one project).
+2. Otherwise `default_flags` is used.
+3. Otherwise no flags are passed (plain `claude`).
+
+By default there is no config file, so every project launches plain `claude`. To run **all** projects in "YOLO" mode (skipping permission prompts), set:
+
+```sh
+default_flags=--dangerously-skip-permissions
+```
+
+Lines starting with `#` and blank lines are ignored.
 
 ## Icon caching
 
@@ -120,3 +164,11 @@ rm ~/.claude-launcher-icons
 ```
 
 If the launcher is invoked from within an existing Claude Code session (detected via `$CLAUDECODE`), it skips the API call and uses the fallback folder icon to avoid nested API calls.
+
+## Tests
+
+The config and per-project flag logic is covered by a zsh test suite (no external dependencies, no real `claude` invocation):
+
+```sh
+zsh tests/test-config.zsh
+```
