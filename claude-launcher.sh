@@ -15,6 +15,7 @@
 # Or auto-launch by adding to ~/.zshrc:
 #   [[ "$(pwd)" == "$LC_PROJECTS_DIR" ]] && lc
 
+_LC_VERSION="2.0.0"
 _LC_TAB_TITLE=""
 
 _lc_set_title() {
@@ -470,8 +471,8 @@ _lc_display() {
     local icon_config=$'\uf013'
 
     echo ""
-    printf "  %s──%s %sClaude Launcher%s %s──────────────%s\n" \
-        "$c_line" "$c_reset" "$c_title" "$c_reset" "$c_line" "$c_reset"
+    printf "  %s──%s %sClaude Launcher%s %sv%s%s %s──────────%s\n" \
+        "$c_line" "$c_reset" "$c_title" "$c_reset" "$c_num" "$_LC_VERSION" "$c_reset" "$c_line" "$c_reset"
     echo ""
 
     printf "  %s%2d%s  %s%s%s  %s\n" \
