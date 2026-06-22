@@ -103,7 +103,213 @@ _lc_config_unset() {
 }
 
 # Interactive configuration walkthrough. Loops until the user chooses Done.
+# Catalog of common interactive claude flags surfaced in the toggle matrix.
+# Parallel arrays: token | type (bool|value) | description.
+_lc_flag_catalog_keys=(
+    '--dangerously-skip-permissions'
+    '--continue'
+    '--ide'
+    '--verbose'
+    '--debug'
+    '--safe-mode'
+    '--bare'
+    '--chrome'
+    '--fork-session'
+    '--model'
+    '--effort'
+)
+_lc_flag_catalog_types=(
+    bool bool bool bool bool bool bool bool bool value value
+)
+_lc_flag_catalog_descs=(
+    'Skip ALL permission prompts (YOLO — sandboxes only)'
+    'Continue the most recent conversation in the project dir'
+    'Auto-connect to an IDE on startup'
+    'Verbose output'
+    'Debug mode'
+    'Disable all customizations (troubleshooting)'
+    'Minimal mode: skip hooks, LSP, plugins, memory, CLAUDE.md'
+    'Enable Claude in Chrome integration'
+    'On resume/continue, start a fresh session ID'
+    'Model alias or name (e.g. opus, sonnet, fable)'
+    'Reasoning effort: low | medium | high | xhigh | max'
+)
+
+# _lc_flag_matrix <config-key> <label> <allow_inherit>
+# Renders an on/off matrix of known flags for the given config key and lets the
+# user toggle each one. Custom/unrecognized flags are preserved untouched.
+_lc_flag_matrix() {
+    # typeset_silent: re-declaring a `local` inside a loop otherwise echoes
+    # "name=value" to stdout in zsh; local_options reverts both on return.
+    setopt local_options typeset_silent
+    local key="$1" label="$2" allow_inherit="${3:-0}"
+
+    local c_line=$'\e[38;5;240m'
+    local c_title=$'\e[38;5;111m'
+    local c_num=$'\e[38;5;242m'
+    local c_dim=$'\e[38;5;242m'
+    local c_val=$'\e[38;5;215m'
+    local c_prompt=$'\e[38;5;111m'
+    local c_ok=$'\e[38;5;114m'
+    local c_on=$'\e[38;5;114m'
+    local c_off=$'\e[38;5;240m'
+    local c_reset=$'\e[0m'
+
+    local -a fk ft fd
+    fk=("${_lc_flag_catalog_keys[@]}")
+    ft=("${_lc_flag_catalog_types[@]}")
+    fd=("${_lc_flag_catalog_descs[@]}")
+
+    while true; do
+        # Re-read + re-parse on every iteration so the view never goes stale.
+        local cur have=0
+        if cur="$(_lc_config_get "$key")"; then have=1; else cur=""; fi
+
+        local -A onbool valof
+        local -a custom toks
+        onbool=() valof=() custom=() toks=( ${=cur} )
+        local i=1
+        while (( i <= ${#toks} )); do
+            local t="${toks[$i]}" matched=0 j
+            for (( j=1; j<=${#fk}; j++ )); do
+                if [[ "$t" == "${fk[$j]}" ]]; then
+                    matched=1
+                    if [[ "${ft[$j]}" == value ]]; then
+                        (( i++ )); valof[${fk[$j]}]="${toks[$i]}"
+                    else
+                        onbool[${fk[$j]}]=1
+                    fi
+                    break
+                fi
+            done
+            (( matched == 0 )) && custom+=("$t")
+            (( i++ ))
+        done
+
+        # Resolved string for the header.
+        local resolved="$cur"
+        local state_note=""
+        if (( allow_inherit )) && (( have == 0 )); then
+            state_note="inheriting default"
+        fi
+
+        echo ""
+        printf "  %s──%s %sFlags · %s%s %s──────────%s\n" \
+            "$c_line" "$c_reset" "$c_title" "$label" "$c_reset" "$c_line" "$c_reset"
+        echo ""
+        if [[ -n "$state_note" ]]; then
+            printf "  %sStatus:%s %s%s%s\n" "$c_dim" "$c_reset" "$c_dim" "$state_note" "$c_reset"
+        fi
+        printf "  %sActive:%s %s%s%s\n" "$c_dim" "$c_reset" \
+            "$c_val" "${resolved:-<none — plain claude>}" "$c_reset"
+        echo ""
+        printf "  %s  #  on/off  flag%s\n" "$c_dim" "$c_reset"
+        local j
+        for (( j=1; j<=${#fk}; j++ )); do
+            local on=0 ico val_disp=""
+            if [[ "${ft[$j]}" == value ]]; then
+                if (( ${+valof[${fk[$j]}]} )); then on=1; val_disp=" = ${valof[${fk[$j]}]}"; fi
+            else
+                (( ${+onbool[${fk[$j]}]} )) && on=1
+            fi
+            if (( on )); then ico="${c_on}●${c_reset}"; else ico="${c_off}○${c_reset}"; fi
+            printf "  %s%2d%s   %s    %s%-31s%s %s%s%s%s\n" \
+                "$c_num" "$j" "$c_reset" "$ico" \
+                "$c_val" "${fk[$j]}${val_disp}" "$c_reset" \
+                "$c_dim" "${fd[$j]}" "$c_reset" ""
+        done
+        echo ""
+        printf "  %se%s  set custom/other flags   %sx%s  plain claude (clear all)" \
+            "$c_num" "$c_reset" "$c_num" "$c_reset"
+        (( allow_inherit )) && printf "   %sr%s  inherit default" "$c_num" "$c_reset"
+        echo ""
+        printf "  %sq%s  done\n" "$c_num" "$c_reset"
+        echo ""
+        printf "  %s›%s " "$c_prompt" "$c_reset"
+
+        local sel
+        read -r sel || return 0
+        echo ""
+
+        local changed=0
+        if [[ "$sel" =~ ^[0-9]+$ ]] && (( sel >= 1 && sel <= ${#fk} )); then
+            local f="${fk[$sel]}"
+            if [[ "${ft[$sel]}" == bool ]]; then
+                if (( ${+onbool[$f]} )); then unset "onbool[$f]"; else onbool[$f]=1; fi
+                changed=1
+            else
+                local prompt_now
+                if (( ${+valof[$f]} )); then
+                    printf "  New value for %s (current: %s; blank = remove, q = cancel): " \
+                        "$f" "${valof[$f]}"
+                else
+                    printf "  Value for %s (q = cancel): " "$f"
+                fi
+                read -r prompt_now
+                if [[ "$prompt_now" == [qQ] ]]; then
+                    printf "  %sCancelled.%s\n" "$c_dim" "$c_reset"
+                elif [[ -z "$prompt_now" ]]; then
+                    if (( ${+valof[$f]} )); then unset "valof[$f]"; changed=1; fi
+                else
+                    valof[$f]="$prompt_now"; changed=1
+                fi
+            fi
+        else
+            case "$sel" in
+                e|E)
+                    printf "  Custom/other flags (blank = none, q = cancel): "
+                    local ce
+                    read -r ce
+                    if [[ "$ce" == [qQ] ]]; then
+                        printf "  %sCancelled.%s\n" "$c_dim" "$c_reset"
+                    else
+                        custom=( ${=ce} ); changed=1
+                    fi
+                    ;;
+                x|X)
+                    _lc_config_set "$key" ""
+                    printf "  %s✓ %s → plain claude (no flags).%s\n" "$c_ok" "$label" "$c_reset"
+                    continue
+                    ;;
+                r|R)
+                    if (( allow_inherit )); then
+                        _lc_config_unset "$key"
+                        printf "  %s✓ %s now inherits the default.%s\n" "$c_ok" "$label" "$c_reset"
+                    else
+                        printf "  %sUnknown option.%s\n" "$c_dim" "$c_reset"
+                    fi
+                    continue
+                    ;;
+                q|Q|"")
+                    return 0
+                    ;;
+                *)
+                    printf "  %sUnknown option.%s\n" "$c_dim" "$c_reset"
+                    ;;
+            esac
+        fi
+
+        if (( changed )); then
+            local -a out
+            out=()
+            for (( j=1; j<=${#fk}; j++ )); do
+                if [[ "${ft[$j]}" == bool ]]; then
+                    (( ${+onbool[${fk[$j]}]} )) && out+=("${fk[$j]}")
+                else
+                    (( ${+valof[${fk[$j]}]} )) && [[ -n "${valof[${fk[$j]}]}" ]] && \
+                        out+=("${fk[$j]}" "${valof[${fk[$j]}]}")
+                fi
+            done
+            out+=("${custom[@]}")
+            _lc_config_set "$key" "${out[*]}"
+        fi
+    done
+}
+
 _lc_configure() {
+    # See note in _lc_flag_matrix: avoid stray "name=value" output from
+    # re-declaring locals inside the menu loop.
+    setopt local_options typeset_silent
     local projects_dir="$1"; shift
     local -a dirs=("$@")
     local cfg="${LC_CONFIG_FILE:-$HOME/.claude-launcher-config}"
@@ -116,7 +322,6 @@ _lc_configure() {
     local c_prompt=$'\e[38;5;111m'
     local c_ok=$'\e[38;5;114m'
     local c_reset=$'\e[0m'
-    local yolo='--dangerously-skip-permissions'
 
     while true; do
         local cur_default
@@ -130,41 +335,22 @@ _lc_configure() {
         printf "  %sDefault flags:%s %s%s%s\n" \
             "$c_dim" "$c_reset" "$c_val" "${cur_default:-<none — plain claude>}" "$c_reset"
         echo ""
-        printf "  %s%2s%s  Toggle YOLO default (%s)\n" "$c_num" "1" "$c_reset" "$yolo"
-        printf "  %s%2s%s  Set default flags for ALL projects\n" "$c_num" "2" "$c_reset"
-        printf "  %s%2s%s  Configure a specific project\n" "$c_num" "3" "$c_reset"
-        printf "  %s%2s%s  View raw config file\n" "$c_num" "4" "$c_reset"
+        printf "  %s%2s%s  Edit flags for ALL projects (default)\n" "$c_num" "1" "$c_reset"
+        printf "  %s%2s%s  Edit flags for a specific project\n" "$c_num" "2" "$c_reset"
+        printf "  %s%2s%s  View raw config file\n" "$c_num" "3" "$c_reset"
         printf "  %s%2s%s  Done\n" "$c_num" "q" "$c_reset"
         echo ""
         printf "  %s›%s " "$c_prompt" "$c_reset"
 
         local sel
-        read -r sel
+        read -r sel || return 0
         echo ""
 
         case "$sel" in
             1)
-                if [[ " $cur_default " == *" $yolo "* ]]; then
-                    local new="" tok
-                    for tok in ${=cur_default}; do
-                        [[ "$tok" == "$yolo" ]] && continue
-                        new="${new:+$new }$tok"
-                    done
-                    _lc_config_set default_flags "$new"
-                    printf "  %s✓ YOLO disabled by default.%s\n" "$c_ok" "$c_reset"
-                else
-                    _lc_config_set default_flags "${cur_default:+$cur_default }$yolo"
-                    printf "  %s✓ YOLO enabled by default — all projects skip permission prompts.%s\n" "$c_ok" "$c_reset"
-                fi
+                _lc_flag_matrix default_flags "ALL projects (default)" 0
                 ;;
             2)
-                printf "  Enter flags applied to ALL projects (blank = none): "
-                local nf
-                read -r nf
-                _lc_config_set default_flags "$nf"
-                printf "  %s✓ Default flags set to: %s%s\n" "$c_ok" "${nf:-<none>}" "$c_reset"
-                ;;
-            3)
                 if [[ ${#dirs[@]} -eq 0 ]]; then
                     printf "  %sNo projects found under %s%s\n" "$c_dim" "$projects_dir" "$c_reset"
                     continue
@@ -184,37 +370,9 @@ _lc_configure() {
                 fi
                 local pname
                 pname="$(basename "${dirs[$pnum]}")"
-                local cur_proj have_proj=0
-                if cur_proj="$(_lc_config_get "$pname")"; then have_proj=1; fi
-                printf "  %s%s%s currently: %s%s%s\n" \
-                    "$c_val" "$pname" "$c_reset" "$c_val" \
-                    "$( (( have_proj )) && printf '%s' "${cur_proj:-<empty — plain claude>}" || printf '<inherits default>' )" \
-                    "$c_reset"
-                echo ""
-                printf "  %s%2s%s  YOLO (%s)\n" "$c_num" "1" "$c_reset" "$yolo"
-                printf "  %s%2s%s  Plain claude (no flags, ignore default)\n" "$c_num" "2" "$c_reset"
-                printf "  %s%2s%s  Custom flags\n" "$c_num" "3" "$c_reset"
-                printf "  %s%2s%s  Inherit default (remove override)\n" "$c_num" "4" "$c_reset"
-                printf "  %s›%s " "$c_prompt" "$c_reset"
-                local psel
-                read -r psel
-                echo ""
-                case "$psel" in
-                    1) _lc_config_set "$pname" "$yolo"
-                       printf "  %s✓ %s → YOLO.%s\n" "$c_ok" "$pname" "$c_reset" ;;
-                    2) _lc_config_set "$pname" ""
-                       printf "  %s✓ %s → plain claude.%s\n" "$c_ok" "$pname" "$c_reset" ;;
-                    3) printf "  Enter flags for %s: " "$pname"
-                       local cf
-                       read -r cf
-                       _lc_config_set "$pname" "$cf"
-                       printf "  %s✓ %s → %s%s\n" "$c_ok" "$pname" "${cf:-<none>}" "$c_reset" ;;
-                    4) _lc_config_unset "$pname"
-                       printf "  %s✓ %s now inherits the default.%s\n" "$c_ok" "$pname" "$c_reset" ;;
-                    *) printf "  %sNo change.%s\n" "$c_dim" "$c_reset" ;;
-                esac
+                _lc_flag_matrix "$pname" "$pname" 1
                 ;;
-            4)
+            3)
                 if [[ -s "$cfg" ]]; then
                     printf "  %s── %s ──%s\n" "$c_dim" "$cfg" "$c_reset"
                     local line

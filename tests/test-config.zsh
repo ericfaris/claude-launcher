@@ -117,42 +117,65 @@ PROJECTS_DIR="${TMPDIR_TEST}/projects"
 mkdir -p "$PROJECTS_DIR/alpha" "$PROJECTS_DIR/beta"
 DIRS=("$PROJECTS_DIR/alpha" "$PROJECTS_DIR/beta")
 
-# Toggle YOLO on (option 1), then Done (q)
+# Matrix row numbers: 1=YOLO 2=--continue ... 10=--model 11=--effort
+# Flow: main menu '1' opens the default-flags matrix; toggle rows; 'q' exits the
+# matrix; 'q' exits config.
+
+# Toggle YOLO on via the matrix (row 1)
 reset_config
-printf '1\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
-assert_eq "toggle enables YOLO default" \
+printf '1\n1\nq\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
+assert_eq "matrix toggles YOLO default on" \
     "--dangerously-skip-permissions" "$(_lc_config_get default_flags)"
 
-# Toggle YOLO off again
-printf '1\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
-assert_eq "toggle disables YOLO default" "" "$(_lc_config_get default_flags)"
+# Toggle YOLO off again (row 1)
+printf '1\n1\nq\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
+assert_eq "matrix toggles YOLO default off" "" "$(_lc_config_get default_flags)"
 
-# Set arbitrary default flags (option 2)
+# Set a value flag via the matrix: --model (row 10) -> opus
 reset_config
-printf '2\n--model opus\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
-assert_eq "set default flags via walkthrough" "--model opus" "$(_lc_config_get default_flags)"
+printf '1\n10\nopus\nq\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
+assert_eq "matrix sets value flag --model" "--model opus" "$(_lc_config_get default_flags)"
 
-# Configure a specific project: pick #1 (alpha) -> YOLO (sub-option 1)
+# Cancel a value-flag prompt with 'q' leaves existing value untouched
 reset_config
-printf '3\n1\n1\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
-assert_eq "per-project YOLO via walkthrough" \
+_lc_config_set default_flags "--dangerously-skip-permissions"
+printf '1\n10\nq\nq\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
+assert_eq "matrix value-flag prompt 'q' cancels (unchanged)" \
+    "--dangerously-skip-permissions" "$(_lc_config_get default_flags)"
+
+# Custom/other flags via 'e' are preserved alongside toggled flags
+reset_config
+printf '1\ne\n--foo\n2\nq\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
+assert_eq "matrix preserves custom flags when toggling" \
+    "--continue --foo" "$(_lc_config_get default_flags)"
+
+# Per-project: main '2', pick #1 (alpha), then matrix row 1 (YOLO)
+reset_config
+printf '2\n1\n1\nq\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
+assert_eq "per-project YOLO via matrix" \
     "--dangerously-skip-permissions" "$(_lc_config_get alpha)"
 
-# Configure project alpha -> Plain claude (sub-option 2) = empty override
-printf '3\n1\n2\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
+# Per-project plain claude via 'x' = empty override
+reset_config
+printf '2\n1\nx\nq\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
 out="$(_lc_config_get alpha)"; rc=$?
-assert_eq "per-project plain claude sets empty override" "" "$out"
+assert_eq "per-project 'x' sets empty override" "" "$out"
 assert_rc "...and the key is present (rc 0)" 0 "$rc"
 
-# Configure project alpha -> Custom flags (sub-option 3)
-printf '3\n1\n3\n--continue --model opus\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
-assert_eq "per-project custom flags via walkthrough" \
+# Per-project custom flags via 'e'
+printf '2\n1\ne\n--continue --model opus\nq\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
+assert_eq "per-project custom flags via matrix 'e'" \
     "--continue --model opus" "$(_lc_config_get alpha)"
 
-# Configure project alpha -> Inherit default (sub-option 4) removes override
-printf '3\n1\n4\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
+# Cancel custom-flags 'e' prompt with 'q' leaves override untouched
+printf '2\n1\ne\nq\nq\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
+assert_eq "per-project 'e' prompt 'q' cancels (unchanged)" \
+    "--continue --model opus" "$(_lc_config_get alpha)"
+
+# Per-project inherit via 'r' removes the override
+printf '2\n1\nr\nq\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
 _lc_config_get alpha >/dev/null; rc=$?
-assert_rc "per-project inherit-default removes override" 1 "$rc"
+assert_rc "per-project 'r' inherit removes override" 1 "$rc"
 
 # ---------------------------------------------------------------------------
 print -r -- ""

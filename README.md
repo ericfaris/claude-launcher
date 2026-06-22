@@ -114,12 +114,38 @@ Run `lc` to open the menu. Press a single key to select:
 
 ## Per-project Claude flags
 
-You can control which flags `claude` is launched with on a per-project basis. The easiest way is the built-in **configuration walkthrough**: run `lc` and press `c`. It lets you:
+You can control which flags `claude` is launched with on a per-project basis. The easiest way is the built-in **configuration walkthrough**: run `lc` and press `c`. From there you can:
 
-- Toggle **YOLO mode** (`--dangerously-skip-permissions`) as the default for all projects
-- Set arbitrary default flags applied to every project
-- Configure a specific project (YOLO, plain `claude`, custom flags, or inherit the default)
-- View the raw config file
+- **Edit flags for ALL projects (default)** — opens the flag matrix
+- **Edit flags for a specific project** — opens the flag matrix scoped to one project
+- **View the raw config file**
+
+### Flag matrix
+
+The flag matrix surfaces the common interactive `claude` flags as an on/off table. Type a row number to toggle that flag; the change is saved immediately.
+
+```
+    #  on/off  flag
+   1   ○    --dangerously-skip-permissions  Skip ALL permission prompts (YOLO — sandboxes only)
+   2   ●    --continue                      Continue the most recent conversation in the project dir
+   3   ○    --ide                           Auto-connect to an IDE on startup
+   4   ○    --verbose                       Verbose output
+   5   ○    --debug                         Debug mode
+   6   ○    --safe-mode                     Disable all customizations (troubleshooting)
+   7   ○    --bare                          Minimal mode: skip hooks, LSP, plugins, memory, CLAUDE.md
+   8   ○    --chrome                        Enable Claude in Chrome integration
+   9   ○    --fork-session                  On resume/continue, start a fresh session ID
+  10   ●    --model = opus                  Model alias or name (e.g. opus, sonnet, fable)
+  11   ○    --effort                        Reasoning effort: low | medium | high | xhigh | max
+
+  e  set custom/other flags   x  plain claude (clear all)
+  q  done
+```
+
+- `●` = on, `○` = off. Rows **10/11** are value flags — selecting one prompts for the value (blank removes it, `q` cancels).
+- `e` sets any **custom/other flags** not in the table; these are preserved untouched when you toggle the listed flags.
+- `x` clears everything (plain `claude`).
+- For a specific project, an extra `r` option resets it to **inherit the default**.
 
 The walkthrough simply reads and writes the config file described below — you can also edit it by hand.
 
