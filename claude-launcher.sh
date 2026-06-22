@@ -15,14 +15,18 @@
 # Or auto-launch by adding to ~/.zshrc:
 #   [[ "$(pwd)" == "$LC_PROJECTS_DIR" ]] && lc
 
-_LC_VERSION="2.1.1"
+_LC_VERSION="2.2.0"
 _LC_TAB_TITLE=""
 
 _lc_set_title() {
     local title="$1"
     _LC_TAB_TITLE="$title"
-    # OSC 0 sets tab/window title; use ST terminator for Windows Terminal compatibility
-    printf '\033]0;%s\033\\' "$title"
+    # OSC 0 sets tab/window title (BEL terminator — broadest compatibility)
+    printf '\033]0;%s\007' "$title"
+    # WezTerm user var: in WSL2, pane.title can be stuck as the Windows process
+    # name ("wslhost.exe") and OSC 0 alone won't override it.  User vars go
+    # through a different channel and are readable as pane.user_vars in Lua.
+    printf '\033]1337;SetUserVar=TAB_TITLE=%s\007' "$(printf '%s' "$title" | base64 -w 0)"
     # OSC 7 tells WezTerm (and other terminals) the current working directory
     # so per-project tab color kicks in immediately on navigation
     _lc_emit_cwd
@@ -39,7 +43,10 @@ _lc_emit_cwd() {
 }
 
 _lc_precmd() {
-    [[ -n "$_LC_TAB_TITLE" ]] && printf '\033]0;%s\033\\' "$_LC_TAB_TITLE"
+    if [[ -n "$_LC_TAB_TITLE" ]]; then
+        printf '\033]0;%s\007' "$_LC_TAB_TITLE"
+        printf '\033]1337;SetUserVar=TAB_TITLE=%s\007' "$(printf '%s' "$_LC_TAB_TITLE" | base64 -w 0)"
+    fi
     _lc_emit_cwd
 }
 
@@ -480,39 +487,68 @@ _lc_display() {
     local c_prompt=$'\e[38;5;111m'
     local c_reset=$'\e[0m'
 
-    local icon_terminal=$'\uf489'
-    local icon_root=$'\uf07b'
-    local icon_config=$'\uf013'
+    local icon_terminal=$''
+    local icon_root=$''
+    local icon_config=$''
 
-    echo ""
-    printf "  %s──%s %sClaude Launcher%s %sv%s%s %s──────────%s\n" \
-        "$c_line" "$c_reset" "$c_title" "$c_reset" "$c_num" "$_LC_VERSION" "$c_reset" "$c_line" "$c_reset"
-    echo ""
+    # Terminal dimensions for centering
+    local cols=${COLUMNS:-$(tput cols 2>/dev/null || echo 80)}
+    local rows=${LINES:-$(tput lines 2>/dev/null || echo 24)}
 
-    printf "  %s%2d%s  %s%s%s  %s\n" \
-        "$c_num" 1 "$c_reset" "$c_icon" "$icon_terminal" "$c_reset" "terminal"
-    printf "  %s%2d%s  %s%s%s  %s\n" \
-        "$c_num" 2 "$c_reset" "$c_icon" "$icon_root" "$c_reset" "$(basename "$root_dir") (root)"
+    # Horizontal indent: measure widest label vs fixed header width (36 visible chars)
+    local root_label="$(basename "$root_dir") (root)"
+    local max_label=${#root_label}
+    (( max_label < 9 )) && max_label=9  # "terminal" / "configure"
+    local _d _lname
+    for _d in "${dirs[@]}"; do
+        _lname="$(basename "$_d")"
+        (( ${#_lname} > max_label )) && max_label=${#_lname}
+    done
+    local menu_width=$(( 7 + max_label ))
+    (( menu_width < 36 )) && menu_width=36
+    local hpad=$(( (cols - menu_width) / 2 ))
+    (( hpad < 1 )) && hpad=1
+    local indent
+    printf -v indent '%*s' "$hpad" ''
+
+    # Vertical centering
+    # Menu rows: blank+header+blank+terminal+root+blank+configure+blank+prompt = 9
+    # Plus (if dirs): 1 extra blank + N dir rows
+    local menu_rows=$(( 9 + (${#dirs[@]} > 0 ? 1 + ${#dirs[@]} : 0) ))
+    local vpad=$(( (rows - menu_rows) / 2 ))
+    (( vpad < 0 )) && vpad=0
+    local _v
+    for (( _v = 0; _v < vpad; _v++ )); do printf '\n'; done
+
+    printf '\n'
+    printf "%s%s──%s %sClaude Launcher%s %sv%s%s %s──────────%s\n" \
+        "$indent" "$c_line" "$c_reset" "$c_title" "$c_reset" "$c_num" "$_LC_VERSION" "$c_reset" "$c_line" "$c_reset"
+    printf '\n'
+
+    printf "%s%s%2d%s  %s%s%s  %s\n" \
+        "$indent" "$c_num" 1 "$c_reset" "$c_icon" "$icon_terminal" "$c_reset" "terminal"
+    printf "%s%s%2d%s  %s%s%s  %s\n" \
+        "$indent" "$c_num" 2 "$c_reset" "$c_icon" "$icon_root" "$c_reset" "$(basename "$root_dir") (root)"
 
     if [[ ${#dirs[@]} -gt 0 ]]; then
-        echo ""
+        printf '\n'
         local i=3
         local dir name icon
         for dir in "${dirs[@]}"; do
             name="$(basename "$dir")"
             icon="$(_lc_icon_for "$dir")"
-            printf "  %s%2d%s  %s%s%s  %s\n" \
-                "$c_num" "$i" "$c_reset" "$c_icon" "$icon" "$c_reset" "$name"
+            printf "%s%s%2d%s  %s%s%s  %s\n" \
+                "$indent" "$c_num" "$i" "$c_reset" "$c_icon" "$icon" "$c_reset" "$name"
             ((i++))
         done
     fi
 
-    echo ""
-    printf "  %s%2s%s  %s%s%s  %s\n" \
-        "$c_num" "c" "$c_reset" "$c_icon" "$icon_config" "$c_reset" "configure"
+    printf '\n'
+    printf "%s%s%2s%s  %s%s%s  %s\n" \
+        "$indent" "$c_num" "c" "$c_reset" "$c_icon" "$icon_config" "$c_reset" "configure"
 
-    echo ""
-    printf "  %s›%s " "$c_prompt" "$c_reset"
+    printf '\n'
+    printf "%s%s›%s " "$indent" "$c_prompt" "$c_reset"
 }
 
 lc() {
