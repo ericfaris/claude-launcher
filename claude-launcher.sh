@@ -15,7 +15,7 @@
 # Or auto-launch by adding to ~/.zshrc:
 #   [[ "$(pwd)" == "$LC_PROJECTS_DIR" ]] && lc
 
-_LC_VERSION="2.0.0"
+_LC_VERSION="2.1.1"
 _LC_TAB_TITLE=""
 
 _lc_set_title() {
@@ -23,10 +23,24 @@ _lc_set_title() {
     _LC_TAB_TITLE="$title"
     # OSC 0 sets tab/window title; use ST terminator for Windows Terminal compatibility
     printf '\033]0;%s\033\\' "$title"
+    # OSC 7 tells WezTerm (and other terminals) the current working directory
+    # so per-project tab color kicks in immediately on navigation
+    _lc_emit_cwd
+}
+
+# Emit OSC 7 so WezTerm (and other terminals) know the current working directory.
+# Format: \e]7;file://hostname/path\e\\
+# This enables per-project tab coloring in WezTerm based on CWD.
+_lc_emit_cwd() {
+    local path="$PWD"
+    # Percent-encode spaces and special chars that are unsafe in a URI path
+    local encoded="${path// /%20}"
+    printf '\033]7;file://%s%s\033\\' "$(hostname -s 2>/dev/null || echo localhost)" "$encoded"
 }
 
 _lc_precmd() {
     [[ -n "$_LC_TAB_TITLE" ]] && printf '\033]0;%s\033\\' "$_LC_TAB_TITLE"
+    _lc_emit_cwd
 }
 
 # Register precmd hook so the title persists across prompt redraws
@@ -502,6 +516,7 @@ _lc_display() {
 }
 
 lc() {
+    _lc_set_title "Claude Launcher"
     local projects_dir="${LC_PROJECTS_DIR:-$HOME/projects}"
     local -a dirs
 
