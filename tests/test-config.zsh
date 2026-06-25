@@ -85,6 +85,16 @@ assert_eq "per-project override wins over default" \
 reset_config
 assert_eq "no config file -> no flags" "" "$(_lc_flags_for anything)"
 
+# Launch-time sanitization: a stray lone q in the config never reaches claude,
+# even for a hand-edited config that never round-trips through the matrix.
+reset_config
+print -r -- "default_flags=--dangerously-skip-permissions q" >> "$LC_CONFIG_FILE"
+print -r -- "alpha=q --model opus q" >> "$LC_CONFIG_FILE"
+assert_eq "default_flags strips a stray lone q at launch" \
+    "--dangerously-skip-permissions" "$(_lc_flags_for some-random-project)"
+assert_eq "per-project override strips stray lone q tokens at launch" \
+    "--model opus" "$(_lc_flags_for alpha)"
+
 # ---------------------------------------------------------------------------
 print -r -- ""
 print -r -- "_lc_config_set / _lc_config_unset"
@@ -176,6 +186,30 @@ assert_eq "per-project 'e' prompt 'q' cancels (unchanged)" \
 printf '2\n1\nr\nq\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
 _lc_config_get alpha >/dev/null; rc=$?
 assert_rc "per-project 'r' inherit removes override" 1 "$rc"
+
+# ---------------------------------------------------------------------------
+print -r -- ""
+print -r -- "stray 'q' can never be saved as a flag"
+
+# A lone 'q' typed into the custom-flags ('e') prompt must be dropped, not saved.
+reset_config
+printf '1\ne\n--foo q\n2\nq\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
+assert_eq "custom-flags input strips a trailing lone q" \
+    "--continue --foo" "$(_lc_config_get default_flags)"
+
+# 'q' interspersed with real flags is also stripped.
+reset_config
+printf '1\ne\nq --foo q --bar q\nq\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
+assert_eq "custom-flags input strips all lone q tokens" \
+    "--foo --bar" "$(_lc_config_get default_flags)"
+
+# An already-corrupted config self-heals: the matrix drops the stray q on the
+# next save (toggling --continue on here).
+reset_config
+_lc_config_set default_flags "--dangerously-skip-permissions q"
+printf '1\n2\nq\nq\n' | _lc_configure "$PROJECTS_DIR" "${DIRS[@]}" >/dev/null
+assert_eq "existing stray q is dropped on next save" \
+    "--dangerously-skip-permissions --continue" "$(_lc_config_get default_flags)"
 
 # ---------------------------------------------------------------------------
 print -r -- ""

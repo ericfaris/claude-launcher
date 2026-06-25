@@ -15,7 +15,7 @@
 # Or auto-launch by adding to ~/.zshrc:
 #   [[ "$(pwd)" == "$LC_PROJECTS_DIR" ]] && lc
 
-_LC_VERSION="2.2.0"
+_LC_VERSION="2.2.2"
 _LC_TAB_TITLE=""
 
 _lc_set_title() {
@@ -81,11 +81,15 @@ _lc_config_get() {
 # otherwise nothing.
 _lc_flags_for() {
     local name="$1" flags
-    if flags="$(_lc_config_get "$name")"; then
-        printf '%s' "$flags"
-        return 0
+    if ! flags="$(_lc_config_get "$name")"; then
+        flags="$(_lc_config_get default_flags)"
     fi
-    _lc_config_get default_flags
+    # Defense-in-depth: never pass a lone "q"/"Q" token to claude. A stray quit
+    # key that leaked into the config (or a hand-edited file) would otherwise be
+    # handed to claude as a prompt argument. The matrix also strips these on
+    # save; this guards configs that never round-trip through it.
+    local -a toks=( ${=flags} )
+    printf '%s' "${(j: :)${(@)toks:#[qQ]}}"
 }
 
 # Set a key=value in the config file, rewriting in place (no sed, so flag
@@ -204,7 +208,9 @@ _lc_flag_matrix() {
                     break
                 fi
             done
-            (( matched == 0 )) && custom+=("$t")
+            # Never treat a lone "q"/"Q" as a flag — it's the quit key and a
+            # stray one leaking in would be passed to claude as a prompt.
+            (( matched == 0 )) && [[ "$t" != [qQ] ]] && custom+=("$t")
             (( i++ ))
         done
 
@@ -285,7 +291,9 @@ _lc_flag_matrix() {
                     if [[ "$ce" == [qQ] ]]; then
                         printf "  %sCancelled.%s\n" "$c_dim" "$c_reset"
                     else
-                        custom=( ${=ce} ); changed=1
+                        # Drop any lone "q"/"Q" tokens so the quit key can't be
+                        # saved as a flag and passed to claude as a prompt.
+                        custom=( ${${=ce}:#[qQ]} ); changed=1
                     fi
                     ;;
                 x|X)
@@ -481,7 +489,7 @@ _lc_display() {
     local -a dirs=("$@")
 
     local c_line=$'\e[38;5;240m'
-    local c_title=$'\e[38;5;111m'
+    local c_title=$'\e[1m\e[38;5;75m'
     local c_num=$'\e[38;5;242m'
     local c_icon=$'\e[38;5;215m'
     local c_prompt=$'\e[38;5;111m'
@@ -521,8 +529,7 @@ _lc_display() {
     for (( _v = 0; _v < vpad; _v++ )); do printf '\n'; done
 
     printf '\n'
-    printf "%s%s──%s %sClaude Launcher%s %sv%s%s %s──────────%s\n" \
-        "$indent" "$c_line" "$c_reset" "$c_title" "$c_reset" "$c_num" "$_LC_VERSION" "$c_reset" "$c_line" "$c_reset"
+    printf '%s%sClaude Launcher%s  %sv%s%s\n' "$indent" "$c_title" "$c_reset" "$c_num" "$_LC_VERSION" "$c_reset"
     printf '\n'
 
     printf "%s%s%2d%s  %s%s%s  %s\n" \
